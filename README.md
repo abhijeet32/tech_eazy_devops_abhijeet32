@@ -28,10 +28,10 @@ java -jar target/hellomvc-0.0.1-SNAPSHOT.jar
 
 ## Outputs
 ## Java Version
-![Java_version](./images\java-version.png)
+![Java_version](https://github.com/abhijeet32/tech_eazy_devops_abhijeet32/blob/main/images/java-version.png)
 
 ## Build Report
-![Build_report](./images\build.png)
+![Build_report](https://github.com/abhijeet32/tech_eazy_devops_abhijeet32/blob/main/images/build.png)
 
 ## Final result
-![Final_result](./images\after_deployed.png)
+![Final_result](https://github.com/abhijeet32/tech_eazy_devops_abhijeet32/blob/main/images/after_deployed.png)
