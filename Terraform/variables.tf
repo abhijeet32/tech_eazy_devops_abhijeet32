@@ -5,6 +5,13 @@ variable "ssh_key_name" {
 }
 
 variable "ami_id" {
+    description = "Amazon Linux 2 AMI ID"
     type = string
     default = "ami-0360c520857e3138f"
+}
+
+variable "s3_bucket_name" {
+    description = "Name of the S3 bucket for logs"
+    type = string
+    default = "logsbucket"
 }

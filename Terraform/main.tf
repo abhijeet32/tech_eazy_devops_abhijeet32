@@ -78,13 +78,131 @@ resource "aws_security_group" "tech_eazy_sg" {
     }
 }
 
-resource "aws_instance" "tach_eazy_ec2" {
+resource "aws_iam_role" "s3_readonly_role" {
+    name = "tech-eazy-s3-readonly"
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17",
+        Statement = [{
+            Effect = "Allow",
+            Principal = { 
+                Service = "ec2.amazonaws.com" 
+            },
+            Action = "sts:AssumeRole"
+        }]
+    })
+}
+
+resource "aws_iam_role_policy" "s3_readonly_policy" {
+    name = "s3-readonly-policy"
+    role = aws_iam_role.s3_readonly_role.id
+    policy = jsonencode({
+        Version = "2012-10-17",
+        Statement = [
+            {
+            Effect   = "Allow",
+            Action   = ["s3:ListBucket"],
+            Resource = aws_s3_bucket.logs_bucket.arn
+            },
+            {
+            Effect   = "Allow",
+            Action   = ["s3:GetObject"],
+            Resource = "${aws_s3_bucket.logs_bucket.arn}/*"
+            }
+        ]
+    })
+}
+
+resource "aws_iam_role" "s3_upload_role" {
+    name = "tech-eazy-s3-uploader"
+    assume_role_policy = jsonencode({
+        Version = "2012-10-17",
+        Statement = [{
+            Effect = "Allow",
+            Principal = { 
+                Service = "ec2.amazonaws.com" 
+            },
+            Action = "sts:AssumeRole"
+        }]
+    })
+}
+
+resource "aws_iam_role_policy" "s3_upload_policy" {
+    name = "s3-upload-policy"
+    role = aws_iam_role.s3_upload_role.id
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+            Effect = "Allow"
+            Action = [
+                "s3:CreateBucket"
+            ]
+            Resource = "*"
+            },
+            {
+            Effect = "Allow"
+            Action = [
+                "s3:PutObject"
+            ]
+            Resource = "${aws_s3_bucket.logs_bucket.arn}/*"
+            }
+        ]
+    })
+}
+
+resource "aws_iam_instance_profile" "uploader_profile" {
+    name = "tech-eazy-instance-profile"
+    role = aws_iam_role.s3_upload_role.name
+}
+
+
+resource "random_id" "bucket_id" {
+    byte_length = 4
+}
+
+resource "aws_s3_bucket" "logs_bucket" {
+    bucket = "${var.s3_bucket_name}-${random_id.bucket_id.hex}"
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "logs_lifecycle" {
+    bucket = aws_s3_bucket.logs_bucket.id
+
+    rule {
+        id = "log-expiration"
+        status = "Enabled"
+
+        filter {}
+
+        expiration {
+            days = 7
+        }
+    }
+}
+
+
+resource "aws_instance" "tech_eazy_ec2" {
     ami = var.ami_id
     instance_type = "t2.medium"
     subnet_id = aws_subnet.tech_eazy_subnet.id
     vpc_security_group_ids = [aws_security_group.tech_eazy_sg.id]
     associate_public_ip_address = true
     key_name = var.ssh_key_name
+    iam_instance_profile = aws_iam_instance_profile.uploader_profile.name
+
+
+    user_data = <<-EOT
+    #!/bin/bash
+    apt-get update -y
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    sudo apt install unzip
+    unzip awscliv2.zip
+    sudo ./aws/install
+    mkdir -p /app/logs && echo "App log" > /app/logs/app.log
+    BUCKET="${aws_s3_bucket.logs_bucket.id}"
+    aws s3 cp /var/log/cloud-init.log s3://$BUCKET/logs/system/
+    aws s3 cp /app/logs s3://$BUCKET/logs/app/ --recursive
+    EOT
+
 
     tags = {
         Name = "tech-eazy-instance"
